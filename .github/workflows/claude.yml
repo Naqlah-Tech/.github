@@ -4,7 +4,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
-  id-token: write        # ← ADD THIS (fixes the OIDC error)
+  id-token: write
 
 on:
   issue_comment:
@@ -15,7 +15,7 @@ on:
     types: [ opened, synchronize, reopened ]
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true   # ← ADD THIS (fixes Node.js warning)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   claude-review:
@@ -31,14 +31,59 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Run Claude Code Review
+      - name: PR Summary & OCA Code Review
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            Please review this pull request. Focus on:
-            - Bugs and logic errors
-            - Security vulnerabilities
-            - Code quality and best practices
-            - Performance issues
-            Post your findings as inline comments on the specific lines.
+            First, post a PR summary comment with:
+            - What this PR does (2-3 sentences)
+            - Which Odoo modules are affected
+            - Any breaking changes or migration scripts included
+            - Risk level: Low / Medium / High
+
+            Then do a full OCA-standard code review following CLAUDE.md.
+            Post inline comments on specific lines for each issue found.
+            Classify each issue as CRITICAL / ERROR / WARNING / INFO.
+
+      - name: Security Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Do a security-only review of this PR. Check for:
+            - Hardcoded API keys, passwords, or credentials
+            - SQL injection risks
+            - sudo() without justification comment
+            - Public HTTP routes exposing data without auth
+            - Unsanitized user input in controllers
+            Post findings as inline comments. Mark any CRITICAL findings clearly.
+
+      - name: Upgrade & Performance Check
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Check this PR for:
+
+            UPGRADE RISKS:
+            - Fields changed without migration script
+            - Module version not bumped per OCA SemVer
+            - Deprecated methods (@api.one, SavepointCase, openerp imports)
+            - View overrides replacing entire views instead of using xpath
+
+            PERFORMANCE ISSUES:
+            - ORM calls or search() inside loops
+            - Missing index=True on filtered fields
+            - Large recordsets loaded when only counts are needed
+
+            Post inline comments for each issue found.
+
+      - name: Auto Label PR
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Based on the PR changes, apply the correct GitHub labels from this list:
+            bug, enhancement, migration, breaking-change, localization, security, performance
+            Apply all that are relevant.
