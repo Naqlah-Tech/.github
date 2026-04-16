@@ -1,0 +1,5 @@
+{
+  "name": "Claude PR Review",
+  "description": "Automated PR review with Claude",
+  "iconName": "octicon-cpu"
+}

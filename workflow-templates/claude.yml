@@ -1,0 +1,49 @@
+name: Claude PR Review
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+on:
+  # Trigger when someone comments @claude on a PR or issue
+  issue_comment:
+    types: [ created ]
+
+  # Trigger when someone comments @claude on a PR review
+  pull_request_review_comment:
+    types: [ created ]
+
+  # Trigger automatically when a PR is opened or updated
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+
+    # Only run if it's a PR event, OR if comment contains @claude
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude'))
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history so Claude can understand context
+
+      - name: Run Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Optional: customize Claude's review instructions
+          prompt: |
+            Please review this pull request. Focus on:
+            - Bugs and logic errors
+            - Security vulnerabilities
+            - Code quality and best practices
+            - Performance issues
+            Post your findings as inline comments on the specific lines.
